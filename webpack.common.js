@@ -1,53 +1,54 @@
 const path = require('path');
-const CleanWebpackPlugin = require('clean-webpack-plugin');
-const CopyWebpackPlugin = require('copy-webpack-plugin');
-const ExtractTextPlugin = require('extract-text-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const CopyPlugin = require("copy-webpack-plugin");
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const HtmlWebpackExcludeAssetsPlugin = require('html-webpack-exclude-assets-plugin');
-const ScriptExtHtmlWebpackPlugin = require('script-ext-html-webpack-plugin');
+
+const devMode = process.env.NODE_ENV === 'development';
 
 // define webpack plugins
-const cleanDist = new CleanWebpackPlugin(['dist']);
+const cleanDist = new CleanWebpackPlugin();
 
-const extractSass = new ExtractTextPlugin({
-  filename: "[name].[contenthash:12].css",
-  disable: process.env.NODE_ENV === "development"
+const extractSass = new MiniCssExtractPlugin({
+  filename: devMode ? '[name].css' : '[name].[contenthash:12].css',
+  chunkFilename: devMode ? '[id].css' : '[id].[hash].css',
 });
 
 const processHtml = new HtmlWebpackPlugin({
-  excludeAssets: [/index.*\.js/],
   template: './src/index.html',
-  title: 'Simply process excel files',
-});
-
-const excludeAssets = new HtmlWebpackExcludeAssetsPlugin();
-
-const scriptExtension = new ScriptExtHtmlWebpackPlugin({
-  defaultAttribute: 'defer'
+  title: 'Simply process Excel files',
 });
 
 const mainConfig = {
+  name: 'main',
   entry: {
     index: './src/index.js'
   },
   plugins: [
     cleanDist,
-    new CopyWebpackPlugin([{
-      from: './src/images/',
-      to: 'images',
-      toType: 'dir'
-    }]),
+    new CopyPlugin({
+      patterns: [
+        {
+          from: './src/images/',
+          to: 'images'
+        },
+        {
+          from: './src/preload.js',
+          to: 'preload.js',
+          toType: 'file'
+        }
+      ],
+    }),
   ],
   module: {
     rules: [
       {
         test: /\.js$/,
-        exclude: /(node_modules|bower_components)/,
+        exclude: /node_modules/,
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env'],
-            plugins: ['@babel/transform-runtime']
+            'cacheDirectory': true,
           }
         }
       }
@@ -63,14 +64,13 @@ const mainConfig = {
 };
 
 const rendererConfig = {
+  name: 'renderer',
   entry: {
     renderer: './src/renderer.js'
   },
   plugins: [
     extractSass,
-    processHtml,
-    scriptExtension,
-    excludeAssets
+    processHtml
   ],
   module: {
     rules: [
@@ -80,17 +80,17 @@ const rendererConfig = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env'],
-            plugins: ['@babel/transform-runtime']
+            'cacheDirectory': true,
           }
         }
       },
       {
         test: /\.scss$/,
-        use: extractSass.extract({
-          fallback: 'style-loader',
-          use: ['css-loader', 'sass-loader']
-        })
+        use: [
+          devMode ? 'style-loader' : MiniCssExtractPlugin.loader,
+          'css-loader',
+          'sass-loader'
+        ]
       }
     ]
   },
